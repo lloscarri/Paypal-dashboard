@@ -49,8 +49,8 @@
   .connected-bar{background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.15);border-radius:var(--radius-sm);padding:10px 16px;margin-bottom:20px;display:none;align-items:center;gap:10px;font-size:12px;}
   .connected-bar.show{display:flex;}
   .connected-info{flex:1;color:rgba(34,197,94,0.9);}
-  .fx-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 16px;margin-bottom:20px;font-size:11px;color:var(--muted);display:none;}
-  .fx-bar.show{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+  .fx-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 16px;margin-bottom:20px;font-size:11px;color:var(--muted);display:none;align-items:center;gap:16px;flex-wrap:wrap;}
+  .fx-bar.show{display:flex;}
   .fx-rate{color:var(--text);}
   .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
   .metric-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;position:relative;overflow:hidden;}
@@ -108,7 +108,7 @@
     <h2>API Credentials</h2>
     <p>Tus credenciales se guardan solo en localStorage de este navegador. Nunca salen de tu maquina.</p>
     <div class="note-green">Guardadas bajo la clave <code>pp_live_creds</code>. No se envian al chat ni a ningun servidor externo.</div>
-    <div class="note-blue">Todos los montos se convierten automaticamente a USD usando tasas de cambio en tiempo real (exchangerate-api.com).</div>
+    <div class="note-blue">Solo muestra ventas recibidas, fees de PayPal y refunds que hiciste. Pagos que tu enviaste a otros estan excluidos. Todo en USD.</div>
     <div id="alert-error" class="alert alert-error"></div>
     <div class="fields-grid">
       <div class="field">
@@ -148,16 +148,16 @@
   </div>
 
   <div class="fx-bar" id="fx-bar">
-    <span>Tasas de cambio a USD:</span>
-    <span class="fx-rate" id="fx-eur">EUR: cargando...</span>
-    <span class="fx-rate" id="fx-mxn">MXN: cargando...</span>
+    <span>Tasas USD:</span>
+    <span class="fx-rate" id="fx-eur">EUR...</span>
+    <span class="fx-rate" id="fx-mxn">MXN...</span>
     <span style="margin-left:auto;font-size:10px" id="fx-time"></span>
   </div>
 
   <div class="metrics" id="metrics" style="display:none">
     <div class="metric-card sales"><div class="metric-label">Ventas brutas (USD)</div><div class="metric-value blue" id="m-sales">-</div><div class="metric-sub" id="m-sales-count">-</div></div>
     <div class="metric-card fees"><div class="metric-label">Fees PayPal (USD)</div><div class="metric-value amber" id="m-fees">-</div><div class="metric-sub" id="m-fees-pct">-</div></div>
-    <div class="metric-card refunds"><div class="metric-label">Refunds (USD)</div><div class="metric-value red" id="m-refunds">-</div><div class="metric-sub" id="m-refunds-count">-</div></div>
+    <div class="metric-card refunds"><div class="metric-label">Refunds hechos (USD)</div><div class="metric-value red" id="m-refunds">-</div><div class="metric-sub" id="m-refunds-count">-</div></div>
     <div class="metric-card net"><div class="metric-label">Neto real (USD)</div><div class="metric-value green" id="m-net">-</div><div class="metric-sub">ventas - fees - refunds</div></div>
   </div>
 
@@ -203,20 +203,18 @@ async function loadFX(){
     const d=await res.json();
     FX.EUR=1/d.rates.EUR;
     FX.MXN=1/d.rates.MXN;
-    FX.USD=1;
-    $('fx-eur').textContent=`EUR: 1 = $${FX.EUR.toFixed(4)}`;
-    $('fx-mxn').textContent=`MXN: 1 = $${FX.MXN.toFixed(4)}`;
+    $('fx-eur').textContent=`1 EUR = $${FX.EUR.toFixed(4)}`;
+    $('fx-mxn').textContent=`1 MXN = $${FX.MXN.toFixed(4)}`;
     $('fx-time').textContent=`Actualizado: ${new Date().toLocaleTimeString('es')}`;
   }catch(e){
-    $('fx-eur').textContent='EUR: ~1.08';
-    $('fx-mxn').textContent='MXN: ~0.049';
+    $('fx-eur').textContent='EUR ~1.08';
+    $('fx-mxn').textContent='MXN ~0.049';
   }
   $('fx-bar').classList.add('show');
 }
 
 function toUSD(amount,currency){
-  const rate=FX[currency]||1;
-  return amount*rate;
+  return amount*(FX[currency]||1);
 }
 
 function loadSaved(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY));}catch{return null;}}
@@ -267,7 +265,7 @@ function showDashboard(){
   const pill=$('env-pill');pill.style.display='inline-block';
   pill.className='env-pill '+S.env;pill.textContent=S.env==='live'?'LIVE':'SANDBOX';
   $('status-dot').className='status-dot live';
-  $('connected-info').textContent=`Conectado - ${S.env==='live'?'Produccion':'Sandbox'} - Todo en USD`;
+  $('connected-info').textContent=`Conectado - ${S.env==='live'?'Produccion':'Sandbox'} - Solo ventas, fees y refunds en USD`;
 }
 
 function disconnect(){
@@ -313,10 +311,32 @@ function classify(t){
   const ti=t.transaction_info;
   const code=(ti.transaction_event_code||'').toUpperCase();
   const amt=parseFloat(ti.transaction_amount?.value||0);
+
+  // EXCLUIR: pagos que yo hice a otros, transferencias, retiros, disputas ganadas
+  // T0000 negativo = pago enviado a alguien
+  // T0600 = transferencia interna
+  // T0700 = pago reverso interno
+  // T0805 = reverso de disputa (dinero que te devuelve PayPal, no de cliente)
+  // T1106 = reverso de chargeback (dinero que te devuelve PayPal)
+  // T0403 = retiro a banco
+  // T0101 = suscripcion que tu pagas
+  // T0600, T0700, T0805, T1106 son movimientos internos de PayPal, no ventas reales
+  const EXCLUIR = ['T0600','T0700','T0805','T1106','T0403','T0101'];
+  if(EXCLUIR.includes(code)) return null;
+
+  // Refunds que TU hiciste a compradores (T1107, T1108, T1109)
   if(/^T110[789]/.test(code)) return 'refund';
-  if(/^T(0006|0000)/.test(code)&&amt<0) return 'refund';
+
+  // Fees de PayPal (T0200, T0201, T0209)
   if(/^T020[01]/.test(code)||code==='T0209') return 'fee';
-  if(amt>0&&/^T(0006|0000|0001|0002|0003|0011|0012|0013)/.test(code)) return 'sale';
+
+  // Ventas recibidas: pagos entrantes positivos
+  // T0002 = pago recurrente recibido
+  // T0011 = pago suscripcion recibido
+  // T0012, T0013 = pagos recibidos
+  // T0000 positivo = pago directo recibido
+  if(amt>0&&/^T(0000|0001|0002|0003|0011|0012|0013)/.test(code)) return 'sale';
+
   return null;
 }
 
@@ -332,14 +352,16 @@ async function load(){
       const cur=ti.transaction_amount?.currency_code||'USD';
       const amt=parseFloat(ti.transaction_amount?.value||0);
       const fee=Math.abs(parseFloat(ti.fee_amount?.value||0));
-      const amtUSD=toUSD(amt,cur);
+      const amtUSD=toUSD(Math.abs(amt),cur);
       const feeUSD=toUSD(fee,cur);
-      rows.push({type,date:ti.transaction_initiation_date,id:ti.transaction_id,
+      rows.push({
+        type,date:ti.transaction_initiation_date,id:ti.transaction_id,
         desc:ti.transaction_subject||ti.transaction_note||ti.transaction_event_code||'-',
         email:t.payer_info?.email_address||'-',
-        amount:amt,fee,amtUSD,feeUSD,
-        netUSD:type==='sale'?amtUSD-feeUSD:amtUSD,
-        currency:cur});
+        origAmt:amt,fee,amtUSD,feeUSD,
+        netUSD:type==='sale'?amtUSD-feeUSD:(type==='refund'?-amtUSD:amtUSD),
+        currency:cur
+      });
     }
     rows.sort((a,b)=>new Date(b.date)-new Date(a.date));
     S.rows=rows;S.page=1;
@@ -355,8 +377,8 @@ function renderMetrics(rows){
   const feeRows=rows.filter(r=>r.type==='fee');
   const refunds=rows.filter(r=>r.type==='refund');
   const tSales=sales.reduce((s,r)=>s+r.amtUSD,0);
-  const tFees=sales.reduce((s,r)=>s+r.feeUSD,0)+feeRows.reduce((s,r)=>s+Math.abs(r.amtUSD),0);
-  const tRef=Math.abs(refunds.reduce((s,r)=>s+r.amtUSD,0));
+  const tFees=sales.reduce((s,r)=>s+r.feeUSD,0)+feeRows.reduce((s,r)=>s+r.amtUSD,0);
+  const tRef=refunds.reduce((s,r)=>s+r.amtUSD,0);
   $('m-sales').textContent=fmtUSD(tSales);$('m-sales-count').textContent=`${sales.length} transacciones`;
   $('m-fees').textContent=fmtUSD(tFees);$('m-fees-pct').textContent=tSales>0?`${((tFees/tSales)*100).toFixed(2)}% de ventas`:'-';
   $('m-refunds').textContent=fmtUSD(tRef);$('m-refunds-count').textContent=`${refunds.length} reembolso${refunds.length!==1?'s':''}`;
@@ -375,19 +397,19 @@ function renderTable(rows){
   const labels={sale:'Venta',fee:'Fee',refund:'Refund'};
   const cls={sale:'type-sale',fee:'type-fee',refund:'type-refund'};
   tbody.innerHTML=slice.map(r=>{
-    const amtUSDStr=r.type==='sale'?fmtUSD(r.amtUSD):`-${fmtUSD(Math.abs(r.amtUSD))}`;
+    const amtStr=r.type==='refund'?`-${fmtUSD(r.amtUSD)}`:fmtUSD(r.amtUSD);
     const amtCol=r.type==='sale'?'var(--pp-blue)':r.type==='fee'?'var(--amber)':'var(--red)';
     const feeStr=r.type==='sale'&&r.feeUSD>0?`-${fmtUSD(r.feeUSD)}`:'-';
-    const netStr=r.type==='sale'?fmtUSD(r.netUSD):'-';
+    const netStr=r.type==='sale'?fmtUSD(r.netUSD):r.type==='refund'?`-${fmtUSD(r.amtUSD)}`:'-';
     const netCol=r.netUSD>=0?'var(--green)':'var(--red)';
-    const origStr=r.currency!=='USD'?`<div class="orig-amt">${fmt(r.amount,r.currency)}</div>`:'';
+    const origStr=r.currency!=='USD'?`<div class="orig-amt">${fmt(Math.abs(r.origAmt),r.currency)}</div>`:'';
     return `<tr>
       <td><span class="type-badge ${cls[r.type]}">${labels[r.type]}</span></td>
       <td>${fmtDate(r.date)}</td>
       <td class="mono">${(r.id||'').substring(0,13)}</td>
       <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)" title="${r.desc}">${r.desc}</td>
       <td class="mono" style="font-size:10px;color:var(--muted)">${r.email}</td>
-      <td style="text-align:right;color:${amtCol};font-family:'Fraunces',serif;font-size:14px;font-weight:600">${amtUSDStr}${origStr}</td>
+      <td style="text-align:right;color:${amtCol};font-family:'Fraunces',serif;font-size:14px;font-weight:600">${amtStr}${origStr}</td>
       <td style="text-align:right;color:var(--amber);font-size:11px">${feeStr}</td>
       <td style="text-align:right;color:${netCol};font-size:11px">${netStr}</td>
     </tr>`;
@@ -398,8 +420,8 @@ function changePage(dir){S.page=Math.max(1,Math.min(Math.ceil(S.rows.length/S.pa
 
 function exportCSV(){
   if(!S.rows.length) return;
-  const h=['Tipo','Fecha','ID','Descripcion','Email','Moneda original','Monto original','Venta USD','Fee USD','Neto USD'];
-  const data=S.rows.map(r=>[r.type,r.date,r.id,`"${r.desc}"`,r.email,r.currency,r.amount.toFixed(2),r.amtUSD.toFixed(2),r.feeUSD.toFixed(2),r.netUSD.toFixed(2)]);
+  const h=['Tipo','Fecha','ID','Descripcion','Email','Moneda orig','Monto orig','Venta USD','Fee USD','Neto USD'];
+  const data=S.rows.map(r=>[r.type,r.date,r.id,`"${r.desc}"`,r.email,r.currency,Math.abs(r.origAmt).toFixed(2),r.amtUSD.toFixed(2),r.feeUSD.toFixed(2),r.netUSD.toFixed(2)]);
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([[h,...data].map(r=>r.join(',')).join('\n')],{type:'text/csv'}));
   a.download=`paypal_ventas_usd_${new Date().toISOString().split('T')[0]}.csv`;a.click();
