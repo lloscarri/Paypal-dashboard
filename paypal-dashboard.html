@@ -43,6 +43,8 @@
   .btn-secondary:hover{color:var(--text);background:var(--surface2);}
   .btn-danger{background:transparent;color:var(--red);border:1px solid rgba(239,68,68,0.2);}
   .btn-danger:hover{background:rgba(239,68,68,0.08);}
+  .btn-period{padding:6px 12px;border-radius:var(--radius-sm);border:1px solid var(--border2);cursor:pointer;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;background:transparent;color:var(--muted);transition:all 0.15s;}
+  .btn-period:hover,.btn-period.active{background:var(--pp-blue);color:#fff;border-color:var(--pp-blue);}
   .spinner{display:inline-block;width:12px;height:12px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin 0.7s linear infinite;vertical-align:middle;margin-right:6px;}
   .alert{border-radius:var(--radius-sm);padding:12px 16px;font-size:12px;margin-bottom:16px;display:none;line-height:1.7;}
   .alert-error{background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);color:#ef4444;}
@@ -66,10 +68,12 @@
   .metric-value.red{color:var(--red);}
   .metric-value.green{color:var(--green);}
   .metric-sub{font-size:10px;color:var(--muted);margin-top:4px;}
-  .filter-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 20px;margin-bottom:20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+  .filter-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 20px;margin-bottom:20px;}
+  .filter-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;}
+  .filter-bottom{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
   .filter-bar label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;}
-  .filter-bar input[type="date"],.filter-bar select{background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-family:'DM Mono',monospace;font-size:12px;padding:7px 10px;outline:none;}
-  .filter-bar input:focus,.filter-bar select:focus{border-color:var(--pp-blue);}
+  .filter-bar input[type="date"]{background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-family:'DM Mono',monospace;font-size:12px;padding:7px 10px;outline:none;}
+  .filter-bar input[type="date"]:focus{border-color:var(--pp-blue);}
   .filter-spacer{flex:1;}
   .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
   .table-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
@@ -85,7 +89,6 @@
   td.mono{font-size:11px;color:var(--muted);}
   .type-badge{display:inline-block;font-size:9px;font-weight:500;padding:3px 8px;border-radius:99px;text-transform:uppercase;letter-spacing:0.06em;}
   .type-sale{background:rgba(0,156,222,0.12);color:var(--pp-blue);border:1px solid rgba(0,156,222,0.2);}
-  .type-fee{background:rgba(245,158,11,0.1);color:var(--amber);border:1px solid rgba(245,158,11,0.2);}
   .type-refund{background:rgba(239,68,68,0.1);color:var(--red);border:1px solid rgba(239,68,68,0.2);}
   .orig-amt{font-size:10px;color:var(--muted);margin-top:2px;}
   .pagination{padding:14px 20px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;}
@@ -108,7 +111,7 @@
     <h2>API Credentials</h2>
     <p>Tus credenciales se guardan solo en localStorage de este navegador. Nunca salen de tu maquina.</p>
     <div class="note-green">Guardadas bajo la clave <code>pp_live_creds</code>. No se envian al chat ni a ningun servidor externo.</div>
-    <div class="note-blue">Solo muestra ventas recibidas, fees de PayPal y refunds que hiciste. Pagos que tu enviaste a otros estan excluidos. Todo en USD.</div>
+    <div class="note-blue">Solo ventas recibidas, fees de PayPal y refunds que hiciste. Todo en USD. Fechas en hora de Texas (CT).</div>
     <div id="alert-error" class="alert alert-error"></div>
     <div class="fields-grid">
       <div class="field">
@@ -124,14 +127,6 @@
         <select id="envSelect">
           <option value="live">Live (produccion)</option>
           <option value="sandbox">Sandbox (pruebas)</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>Periodo inicial</label>
-        <select id="periodSelect">
-          <option value="30">Ultimos 30 dias</option>
-          <option value="60">Ultimos 60 dias</option>
-          <option value="90">Ultimos 90 dias</option>
         </select>
       </div>
     </div>
@@ -162,11 +157,24 @@
   </div>
 
   <div class="filter-bar" id="filter-bar" style="display:none">
-    <label>Desde</label><input type="date" id="f-start"/>
-    <label>Hasta</label><input type="date" id="f-end"/>
-    <div class="filter-spacer"></div>
-    <button class="btn btn-primary" style="padding:7px 16px;font-size:11px" onclick="load()">Actualizar</button>
-    <button class="btn btn-secondary" style="padding:7px 14px;font-size:11px" onclick="exportCSV()">Exportar CSV</button>
+    <div class="filter-top">
+      <button class="btn-period" onclick="setPeriod('ayer',this)">Ayer</button>
+      <button class="btn-period active" onclick="setPeriod('hoy',this)">Hoy</button>
+      <button class="btn-period" onclick="setPeriod('semana',this)">Esta semana</button>
+      <button class="btn-period" onclick="setPeriod('mes',this)">Este mes</button>
+      <button class="btn-period" onclick="setPeriod('30',this)">30 dias</button>
+      <button class="btn-period" onclick="setPeriod('60',this)">60 dias</button>
+      <button class="btn-period" onclick="setPeriod('90',this)">90 dias</button>
+      <div class="filter-spacer"></div>
+      <button class="btn btn-primary" style="padding:7px 16px;font-size:11px" onclick="load()">Actualizar</button>
+      <button class="btn btn-secondary" style="padding:7px 14px;font-size:11px" onclick="exportCSV()">Exportar CSV</button>
+    </div>
+    <div class="filter-bottom">
+      <label>Desde</label>
+      <input type="date" id="f-start" onchange="clearActivePeriod()"/>
+      <label>Hasta</label>
+      <input type="date" id="f-end" onchange="clearActivePeriod()"/>
+    </div>
   </div>
 
   <div class="table-wrap" id="table-wrap" style="display:none">
@@ -178,7 +186,7 @@
     <div id="alert-load" class="alert alert-error" style="margin:12px 16px"></div>
     <table>
       <thead><tr>
-        <th>Tipo</th><th>Fecha</th><th>ID</th><th>Descripcion</th><th>Email</th>
+        <th>Tipo</th><th>Fecha (CT)</th><th>ID</th><th>Descripcion</th><th>Email</th>
         <th style="text-align:right">Venta (USD)</th><th style="text-align:right">Fee (USD)</th><th style="text-align:right">Neto (USD)</th>
       </tr></thead>
       <tbody id="tx-body"></tbody>
@@ -192,30 +200,75 @@
 </div>
 <script>
 const STORAGE_KEY='pp_live_creds';
+const TZ='America/Chicago'; // Texas CT
 const BASE=env=>`https://api-m${env==='live'?'':'.sandbox'}.paypal.com`;
 const $=id=>document.getElementById(id);
 let S={token:null,env:'live',clientId:null,clientSecret:null,rows:[],page:1,pageSize:20};
 let FX={EUR:1.08,MXN:0.049,USD:1};
 
+// Date helpers — all in CT (America/Chicago)
+function localDate(daysAgo=0){
+  const d=new Date();
+  d.setDate(d.getDate()-daysAgo);
+  return d.toLocaleDateString('en-CA',{timeZone:TZ}); // YYYY-MM-DD
+}
+function startOfDay(dateStr){
+  // dateStr = YYYY-MM-DD in CT, convert to UTC ISO
+  const d=new Date(`${dateStr}T00:00:00`);
+  // Get CT offset
+  const ct=new Date(d.toLocaleString('en-US',{timeZone:TZ}));
+  const diff=d-ct;
+  return new Date(d.getTime()+diff).toISOString();
+}
+function endOfDay(dateStr){
+  const d=new Date(`${dateStr}T23:59:59`);
+  const ct=new Date(d.toLocaleString('en-US',{timeZone:TZ}));
+  const diff=d-ct;
+  return new Date(d.getTime()+diff).toISOString();
+}
+function fmtCT(iso){
+  if(!iso) return '-';
+  return new Date(iso).toLocaleDateString('es',{timeZone:TZ,day:'2-digit',month:'short',year:'numeric'});
+}
+function setPeriod(p, btn){
+  document.querySelectorAll('.btn-period').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  const today=localDate(0);
+  const yesterday=localDate(1);
+  if(p==='ayer'){$('f-start').value=yesterday;$('f-end').value=yesterday;}
+  else if(p==='hoy'){$('f-start').value=today;$('f-end').value=today;}
+  else if(p==='semana'){
+    const d=new Date(); d.setDate(d.getDate()-d.getDay());
+    $('f-start').value=d.toLocaleDateString('en-CA',{timeZone:TZ});
+    $('f-end').value=today;
+  }
+  else if(p==='mes'){
+    const d=new Date(); d.setDate(1);
+    $('f-start').value=d.toLocaleDateString('en-CA',{timeZone:TZ});
+    $('f-end').value=today;
+  }
+  else if(p==='30'){$('f-start').value=localDate(30);$('f-end').value=today;}
+  else if(p==='60'){$('f-start').value=localDate(60);$('f-end').value=today;}
+  else if(p==='90'){$('f-start').value=localDate(90);$('f-end').value=today;}
+}
+function clearActivePeriod(){
+  document.querySelectorAll('.btn-period').forEach(b=>b.classList.remove('active'));
+}
+
 async function loadFX(){
   try{
     const res=await fetch('https://api.exchangerate-api.com/v4/latest/USD');
     const d=await res.json();
-    FX.EUR=1/d.rates.EUR;
-    FX.MXN=1/d.rates.MXN;
+    FX.EUR=1/d.rates.EUR; FX.MXN=1/d.rates.MXN;
     $('fx-eur').textContent=`1 EUR = $${FX.EUR.toFixed(4)}`;
     $('fx-mxn').textContent=`1 MXN = $${FX.MXN.toFixed(4)}`;
-    $('fx-time').textContent=`Actualizado: ${new Date().toLocaleTimeString('es')}`;
+    $('fx-time').textContent=`Actualizado: ${new Date().toLocaleTimeString('es',{timeZone:TZ})} CT`;
   }catch(e){
-    $('fx-eur').textContent='EUR ~1.08';
-    $('fx-mxn').textContent='MXN ~0.049';
+    $('fx-eur').textContent='EUR ~1.08'; $('fx-mxn').textContent='MXN ~0.049';
   }
   $('fx-bar').classList.add('show');
 }
-
-function toUSD(amount,currency){
-  return amount*(FX[currency]||1);
-}
+function toUSD(amount,currency){return amount*(FX[currency]||1);}
 
 function loadSaved(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY));}catch{return null;}}
 function saveCreds(id,sec,env){try{localStorage.setItem(STORAGE_KEY,JSON.stringify({clientId:id,clientSecret:sec,env}));}catch{}}
@@ -260,12 +313,12 @@ function showDashboard(){
   $('config-panel').style.display='none';
   $('connected-bar').classList.add('show');
   $('metrics').style.display='grid';
-  $('filter-bar').style.display='flex';
+  $('filter-bar').style.display='block';
   $('table-wrap').style.display='block';
   const pill=$('env-pill');pill.style.display='inline-block';
   pill.className='env-pill '+S.env;pill.textContent=S.env==='live'?'LIVE':'SANDBOX';
   $('status-dot').className='status-dot live';
-  $('connected-info').textContent=`Conectado - ${S.env==='live'?'Produccion':'Sandbox'} - Solo ventas, fees y refunds en USD`;
+  $('connected-info').textContent=`Conectado - ${S.env==='live'?'Produccion':'Sandbox'} - Solo ventas, fees y refunds - USD`;
 }
 
 function disconnect(){
@@ -279,16 +332,14 @@ function disconnect(){
 }
 
 function getDateRange(){
-  const s=$('f-start').value,e=$('f-end').value;
-  const toISO=(d,end)=>{const dt=new Date(d);dt.setHours(end?23:0,end?59:0,end?59:0,0);return dt.toISOString();};
-  if(s&&e) return{start:toISO(s,false),end:toISO(e,true)};
-  const now=new Date(),days=parseInt($('periodSelect').value)||30;
-  const from=new Date(now);from.setDate(from.getDate()-days);
-  return{start:from.toISOString(),end:now.toISOString()};
+  const s=$('f-start').value, e=$('f-end').value;
+  if(s&&e) return{start:startOfDay(s),end:endOfDay(e)};
+  const yesterday=localDate(1);
+  return{start:startOfDay(yesterday),end:endOfDay(yesterday)};
 }
 
 async function fetchPage(start,end,page){
-  const url=`${BASE(S.env)}/v1/reporting/transactions?start_date=${start}&end_date=${end}&page_size=500&page=${page}&fields=all`;
+  const url=`${BASE(S.env)}/v1/reporting/transactions?start_date=${encodeURIComponent(start)}&end_date=${encodeURIComponent(end)}&page_size=500&page=${page}&fields=all`;
   const res=await fetch(url,{headers:{'Authorization':`Bearer ${S.token}`}});
   if(res.status===401){S.token=await getToken(S.clientId,S.clientSecret,S.env);return fetchPage(start,end,page);}
   const d=await res.json();
@@ -311,32 +362,13 @@ function classify(t){
   const ti=t.transaction_info;
   const code=(ti.transaction_event_code||'').toUpperCase();
   const amt=parseFloat(ti.transaction_amount?.value||0);
-
-  // EXCLUIR: pagos que yo hice a otros, transferencias, retiros, disputas ganadas
-  // T0000 negativo = pago enviado a alguien
-  // T0600 = transferencia interna
-  // T0700 = pago reverso interno
-  // T0805 = reverso de disputa (dinero que te devuelve PayPal, no de cliente)
-  // T1106 = reverso de chargeback (dinero que te devuelve PayPal)
-  // T0403 = retiro a banco
-  // T0101 = suscripcion que tu pagas
-  // T0600, T0700, T0805, T1106 son movimientos internos de PayPal, no ventas reales
-  const EXCLUIR = ['T0600','T0700','T0805','T1106','T0403','T0101','T0200','T0201','T0209'];
+  // Excluir: pagos enviados, transferencias internas, retiros, reversas de disputa, conversiones
+  const EXCLUIR=['T0600','T0700','T0805','T1106','T0403','T0101','T0200','T0201','T0209'];
   if(EXCLUIR.includes(code)) return null;
-
-  // Refunds que TU hiciste a compradores (T1107, T1108, T1109)
+  // Refunds que TU hiciste (T1107, T1108, T1109)
   if(/^T110[789]/.test(code)) return 'refund';
-
-  // Fees de PayPal (T0200, T0201, T0209)
-  // T0200/T0201 = conversion de divisa interna (pago tuyo), NO es fee de venta - EXCLUIDO
-
-  // Ventas recibidas: pagos entrantes positivos
-  // T0002 = pago recurrente recibido
-  // T0011 = pago suscripcion recibido
-  // T0012, T0013 = pagos recibidos
-  // T0000 positivo = pago directo recibido
+  // Ventas recibidas positivas
   if(amt>0&&/^T(0000|0001|0002|0003|0011|0012|0013)/.test(code)) return 'sale';
-
   return null;
 }
 
@@ -359,7 +391,7 @@ async function load(){
         desc:ti.transaction_subject||ti.transaction_note||ti.transaction_event_code||'-',
         email:t.payer_info?.email_address||'-',
         origAmt:amt,fee,amtUSD,feeUSD,
-        netUSD:type==='sale'?amtUSD-feeUSD:(type==='refund'?-amtUSD:amtUSD),
+        netUSD:type==='sale'?amtUSD-feeUSD:-amtUSD,
         currency:cur
       });
     }
@@ -374,10 +406,9 @@ async function load(){
 
 function renderMetrics(rows){
   const sales=rows.filter(r=>r.type==='sale');
-  const feeRows=rows.filter(r=>r.type==='fee');
   const refunds=rows.filter(r=>r.type==='refund');
   const tSales=sales.reduce((s,r)=>s+r.amtUSD,0);
-  const tFees=sales.reduce((s,r)=>s+r.feeUSD,0)+feeRows.reduce((s,r)=>s+r.amtUSD,0);
+  const tFees=sales.reduce((s,r)=>s+r.feeUSD,0);
   const tRef=refunds.reduce((s,r)=>s+r.amtUSD,0);
   $('m-sales').textContent=fmtUSD(tSales);$('m-sales-count').textContent=`${sales.length} transacciones`;
   $('m-fees').textContent=fmtUSD(tFees);$('m-fees-pct').textContent=tSales>0?`${((tFees/tSales)*100).toFixed(2)}% de ventas`:'-';
@@ -394,18 +425,18 @@ function renderTable(rows){
   $('btn-prev').style.display=S.page>1?'':'none';
   $('btn-next').style.display=S.page<pages?'':'none';
   if(!slice.length){tbody.innerHTML='<tr><td colspan="8"><div class="empty-state">Sin movimientos en el periodo</div></td></tr>';return;}
-  const labels={sale:'Venta',fee:'Fee',refund:'Refund'};
-  const cls={sale:'type-sale',fee:'type-fee',refund:'type-refund'};
+  const labels={sale:'Venta',refund:'Refund'};
+  const cls={sale:'type-sale',refund:'type-refund'};
   tbody.innerHTML=slice.map(r=>{
     const amtStr=r.type==='refund'?`-${fmtUSD(r.amtUSD)}`:fmtUSD(r.amtUSD);
-    const amtCol=r.type==='sale'?'var(--pp-blue)':r.type==='fee'?'var(--amber)':'var(--red)';
+    const amtCol=r.type==='sale'?'var(--pp-blue)':'var(--red)';
     const feeStr=r.type==='sale'&&r.feeUSD>0?`-${fmtUSD(r.feeUSD)}`:'-';
-    const netStr=r.type==='sale'?fmtUSD(r.netUSD):r.type==='refund'?`-${fmtUSD(r.amtUSD)}`:'-';
+    const netStr=r.type==='sale'?fmtUSD(r.netUSD):`-${fmtUSD(r.amtUSD)}`;
     const netCol=r.netUSD>=0?'var(--green)':'var(--red)';
     const origStr=r.currency!=='USD'?`<div class="orig-amt">${fmt(Math.abs(r.origAmt),r.currency)}</div>`:'';
     return `<tr>
       <td><span class="type-badge ${cls[r.type]}">${labels[r.type]}</span></td>
-      <td>${fmtDate(r.date)}</td>
+      <td>${fmtCT(r.date)}</td>
       <td class="mono">${(r.id||'').substring(0,13)}</td>
       <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)" title="${r.desc}">${r.desc}</td>
       <td class="mono" style="font-size:10px;color:var(--muted)">${r.email}</td>
@@ -420,16 +451,15 @@ function changePage(dir){S.page=Math.max(1,Math.min(Math.ceil(S.rows.length/S.pa
 
 function exportCSV(){
   if(!S.rows.length) return;
-  const h=['Tipo','Fecha','ID','Descripcion','Email','Moneda orig','Monto orig','Venta USD','Fee USD','Neto USD'];
-  const data=S.rows.map(r=>[r.type,r.date,r.id,`"${r.desc}"`,r.email,r.currency,Math.abs(r.origAmt).toFixed(2),r.amtUSD.toFixed(2),r.feeUSD.toFixed(2),r.netUSD.toFixed(2)]);
+  const h=['Tipo','Fecha CT','ID','Descripcion','Email','Moneda orig','Monto orig','Venta USD','Fee USD','Neto USD'];
+  const data=S.rows.map(r=>[r.type,fmtCT(r.date),r.id,`"${r.desc}"`,r.email,r.currency,Math.abs(r.origAmt).toFixed(2),r.amtUSD.toFixed(2),r.feeUSD.toFixed(2),r.netUSD.toFixed(2)]);
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([[h,...data].map(r=>r.join(',')).join('\n')],{type:'text/csv'}));
-  a.download=`paypal_ventas_usd_${new Date().toISOString().split('T')[0]}.csv`;a.click();
+  a.download=`paypal_ventas_usd_${localDate(0)}.csv`;a.click();
 }
 
 function fmtUSD(val){return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(val);}
 function fmt(val,cur){return new Intl.NumberFormat('en-US',{style:'currency',currency:cur||'USD'}).format(val);}
-function fmtDate(iso){if(!iso)return'-';return new Date(iso).toLocaleDateString('es',{day:'2-digit',month:'short',year:'numeric'});}
 
 function initSaved(){
   const s=loadSaved();if(!s) return;
@@ -439,10 +469,8 @@ function initSaved(){
   $('btn-clear').style.display='inline-block';
 }
 
-const now=new Date(),from=new Date(now);
-from.setDate(from.getDate()-30);
-$('f-start').value=from.toISOString().split('T')[0];
-$('f-end').value=now.toISOString().split('T')[0];
+// Default: ayer
+setPeriod('ayer', document.querySelector('.btn-period'));
 initSaved();
 </script>
 </body>
