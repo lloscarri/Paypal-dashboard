@@ -321,14 +321,14 @@ function classify(t){
   // T0403 = retiro a banco
   // T0101 = suscripcion que tu pagas
   // T0600, T0700, T0805, T1106 son movimientos internos de PayPal, no ventas reales
-  const EXCLUIR = ['T0600','T0700','T0805','T1106','T0403','T0101'];
+  const EXCLUIR = ['T0600','T0700','T0805','T1106','T0403','T0101','T0200','T0201','T0209'];
   if(EXCLUIR.includes(code)) return null;
 
   // Refunds que TU hiciste a compradores (T1107, T1108, T1109)
   if(/^T110[789]/.test(code)) return 'refund';
 
   // Fees de PayPal (T0200, T0201, T0209)
-  if(/^T020[01]/.test(code)||code==='T0209') return 'fee';
+  // T0200/T0201 = conversion de divisa interna (pago tuyo), NO es fee de venta - EXCLUIDO
 
   // Ventas recibidas: pagos entrantes positivos
   // T0002 = pago recurrente recibido
