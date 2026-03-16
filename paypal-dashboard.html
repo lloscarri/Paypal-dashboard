@@ -6,14 +6,7 @@
 <title>PayPal Dashboard · ZCode</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,300&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg:#0a0a0f;--surface:#13131a;--surface2:#1a1a24;
-    --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);
-    --text:#f0eff5;--muted:#888899;
-    --green:#22c55e;--red:#ef4444;--amber:#f59e0b;
-    --pp-blue:#009cde;--pp-dark:#003087;
-    --radius:12px;--radius-sm:8px;
-  }
+  :root{--bg:#0a0a0f;--surface:#13131a;--surface2:#1a1a24;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);--text:#f0eff5;--muted:#888899;--green:#22c55e;--red:#ef4444;--amber:#f59e0b;--pp-blue:#009cde;--pp-dark:#003087;--radius:12px;--radius-sm:8px;}
   *{box-sizing:border-box;margin:0;padding:0;}
   body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;font-size:13px;min-height:100vh;line-height:1.5;}
   body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,156,222,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,156,222,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
@@ -34,6 +27,7 @@
   .card h2{font-family:'Fraunces',serif;font-size:16px;font-weight:300;margin-bottom:6px;}
   .card p{color:var(--muted);font-size:12px;margin-bottom:20px;}
   .note-green{background:rgba(34,197,94,0.07);border:1px solid rgba(34,197,94,0.15);color:rgba(34,197,94,0.85);border-radius:var(--radius-sm);padding:10px 14px;font-size:11px;margin-bottom:16px;}
+  .note-blue{background:rgba(0,156,222,0.07);border:1px solid rgba(0,156,222,0.15);color:rgba(0,156,222,0.85);border-radius:var(--radius-sm);padding:10px 14px;font-size:11px;margin-bottom:16px;}
   .fields-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
   .field{display:flex;flex-direction:column;gap:6px;}
   .field label{font-size:10px;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;display:flex;align-items:center;gap:6px;}
@@ -55,6 +49,9 @@
   .connected-bar{background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.15);border-radius:var(--radius-sm);padding:10px 16px;margin-bottom:20px;display:none;align-items:center;gap:10px;font-size:12px;}
   .connected-bar.show{display:flex;}
   .connected-info{flex:1;color:rgba(34,197,94,0.9);}
+  .fx-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 16px;margin-bottom:20px;font-size:11px;color:var(--muted);display:none;}
+  .fx-bar.show{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+  .fx-rate{color:var(--text);}
   .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
   .metric-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;position:relative;overflow:hidden;}
   .metric-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--ac,var(--border));}
@@ -90,6 +87,7 @@
   .type-sale{background:rgba(0,156,222,0.12);color:var(--pp-blue);border:1px solid rgba(0,156,222,0.2);}
   .type-fee{background:rgba(245,158,11,0.1);color:var(--amber);border:1px solid rgba(245,158,11,0.2);}
   .type-refund{background:rgba(239,68,68,0.1);color:var(--red);border:1px solid rgba(239,68,68,0.2);}
+  .orig-amt{font-size:10px;color:var(--muted);margin-top:2px;}
   .pagination{padding:14px 20px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;}
   .pagination-info{flex:1;font-size:11px;color:var(--muted);}
   .empty-state{padding:48px 20px;text-align:center;color:var(--muted);}
@@ -110,6 +108,7 @@
     <h2>API Credentials</h2>
     <p>Tus credenciales se guardan solo en localStorage de este navegador. Nunca salen de tu maquina.</p>
     <div class="note-green">Guardadas bajo la clave <code>pp_live_creds</code>. No se envian al chat ni a ningun servidor externo.</div>
+    <div class="note-blue">Todos los montos se convierten automaticamente a USD usando tasas de cambio en tiempo real (exchangerate-api.com).</div>
     <div id="alert-error" class="alert alert-error"></div>
     <div class="fields-grid">
       <div class="field">
@@ -148,11 +147,18 @@
     <button class="btn btn-danger" style="padding:5px 12px;font-size:11px" onclick="disconnect()">Desconectar</button>
   </div>
 
+  <div class="fx-bar" id="fx-bar">
+    <span>Tasas de cambio a USD:</span>
+    <span class="fx-rate" id="fx-eur">EUR: cargando...</span>
+    <span class="fx-rate" id="fx-mxn">MXN: cargando...</span>
+    <span style="margin-left:auto;font-size:10px" id="fx-time"></span>
+  </div>
+
   <div class="metrics" id="metrics" style="display:none">
-    <div class="metric-card sales"><div class="metric-label">Ventas brutas</div><div class="metric-value blue" id="m-sales">-</div><div class="metric-sub" id="m-sales-count">-</div></div>
-    <div class="metric-card fees"><div class="metric-label">Fees PayPal</div><div class="metric-value amber" id="m-fees">-</div><div class="metric-sub" id="m-fees-pct">-</div></div>
-    <div class="metric-card refunds"><div class="metric-label">Refunds</div><div class="metric-value red" id="m-refunds">-</div><div class="metric-sub" id="m-refunds-count">-</div></div>
-    <div class="metric-card net"><div class="metric-label">Neto real</div><div class="metric-value green" id="m-net">-</div><div class="metric-sub">ventas - fees - refunds</div></div>
+    <div class="metric-card sales"><div class="metric-label">Ventas brutas (USD)</div><div class="metric-value blue" id="m-sales">-</div><div class="metric-sub" id="m-sales-count">-</div></div>
+    <div class="metric-card fees"><div class="metric-label">Fees PayPal (USD)</div><div class="metric-value amber" id="m-fees">-</div><div class="metric-sub" id="m-fees-pct">-</div></div>
+    <div class="metric-card refunds"><div class="metric-label">Refunds (USD)</div><div class="metric-value red" id="m-refunds">-</div><div class="metric-sub" id="m-refunds-count">-</div></div>
+    <div class="metric-card net"><div class="metric-label">Neto real (USD)</div><div class="metric-value green" id="m-net">-</div><div class="metric-sub">ventas - fees - refunds</div></div>
   </div>
 
   <div class="filter-bar" id="filter-bar" style="display:none">
@@ -173,7 +179,7 @@
     <table>
       <thead><tr>
         <th>Tipo</th><th>Fecha</th><th>ID</th><th>Descripcion</th><th>Email</th>
-        <th style="text-align:right">Venta</th><th style="text-align:right">Fee</th><th style="text-align:right">Neto</th>
+        <th style="text-align:right">Venta (USD)</th><th style="text-align:right">Fee (USD)</th><th style="text-align:right">Neto (USD)</th>
       </tr></thead>
       <tbody id="tx-body"></tbody>
     </table>
@@ -189,6 +195,29 @@ const STORAGE_KEY='pp_live_creds';
 const BASE=env=>`https://api-m${env==='live'?'':'.sandbox'}.paypal.com`;
 const $=id=>document.getElementById(id);
 let S={token:null,env:'live',clientId:null,clientSecret:null,rows:[],page:1,pageSize:20};
+let FX={EUR:1.08,MXN:0.049,USD:1};
+
+async function loadFX(){
+  try{
+    const res=await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+    const d=await res.json();
+    FX.EUR=1/d.rates.EUR;
+    FX.MXN=1/d.rates.MXN;
+    FX.USD=1;
+    $('fx-eur').textContent=`EUR: 1 = $${FX.EUR.toFixed(4)}`;
+    $('fx-mxn').textContent=`MXN: 1 = $${FX.MXN.toFixed(4)}`;
+    $('fx-time').textContent=`Actualizado: ${new Date().toLocaleTimeString('es')}`;
+  }catch(e){
+    $('fx-eur').textContent='EUR: ~1.08';
+    $('fx-mxn').textContent='MXN: ~0.049';
+  }
+  $('fx-bar').classList.add('show');
+}
+
+function toUSD(amount,currency){
+  const rate=FX[currency]||1;
+  return amount*rate;
+}
 
 function loadSaved(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY));}catch{return null;}}
 function saveCreds(id,sec,env){try{localStorage.setItem(STORAGE_KEY,JSON.stringify({clientId:id,clientSecret:sec,env}));}catch{}}
@@ -219,6 +248,7 @@ async function connect(){
     S.token=await getToken(id,sec,env);
     S.env=env;S.clientId=id;S.clientSecret=sec;
     saveCreds(id,sec,env);
+    await loadFX();
     showDashboard();
     await load();
   }catch(e){
@@ -237,13 +267,14 @@ function showDashboard(){
   const pill=$('env-pill');pill.style.display='inline-block';
   pill.className='env-pill '+S.env;pill.textContent=S.env==='live'?'LIVE':'SANDBOX';
   $('status-dot').className='status-dot live';
-  $('connected-info').textContent=`Conectado - ${S.env==='live'?'Produccion':'Sandbox'} - Credenciales guardadas localmente`;
+  $('connected-info').textContent=`Conectado - ${S.env==='live'?'Produccion':'Sandbox'} - Todo en USD`;
 }
 
 function disconnect(){
   S={token:null,env:'live',clientId:null,clientSecret:null,rows:[],page:1,pageSize:20};
   $('config-panel').style.display='block';
   $('connected-bar').classList.remove('show');
+  $('fx-bar').classList.remove('show');
   ['metrics','filter-bar','table-wrap'].forEach(id=>$(id).style.display='none');
   $('env-pill').style.display='none';$('status-dot').className='status-dot';
   initSaved();
@@ -298,12 +329,17 @@ async function load(){
     for(const t of raw){
       const type=classify(t);if(!type) continue;
       const ti=t.transaction_info;
+      const cur=ti.transaction_amount?.currency_code||'USD';
       const amt=parseFloat(ti.transaction_amount?.value||0);
       const fee=Math.abs(parseFloat(ti.fee_amount?.value||0));
+      const amtUSD=toUSD(amt,cur);
+      const feeUSD=toUSD(fee,cur);
       rows.push({type,date:ti.transaction_initiation_date,id:ti.transaction_id,
         desc:ti.transaction_subject||ti.transaction_note||ti.transaction_event_code||'-',
-        email:t.payer_info?.email_address||'-',amount:amt,fee,
-        net:type==='sale'?amt-fee:amt,currency:ti.transaction_amount?.currency_code||'USD'});
+        email:t.payer_info?.email_address||'-',
+        amount:amt,fee,amtUSD,feeUSD,
+        netUSD:type==='sale'?amtUSD-feeUSD:amtUSD,
+        currency:cur});
     }
     rows.sort((a,b)=>new Date(b.date)-new Date(a.date));
     S.rows=rows;S.page=1;
@@ -318,14 +354,13 @@ function renderMetrics(rows){
   const sales=rows.filter(r=>r.type==='sale');
   const feeRows=rows.filter(r=>r.type==='fee');
   const refunds=rows.filter(r=>r.type==='refund');
-  const tSales=sales.reduce((s,r)=>s+r.amount,0);
-  const tFees=sales.reduce((s,r)=>s+r.fee,0)+feeRows.reduce((s,r)=>s+Math.abs(r.amount),0);
-  const tRef=Math.abs(refunds.reduce((s,r)=>s+r.amount,0));
-  const cur=rows.length?rows[0].currency:'USD';
-  $('m-sales').textContent=fmt(tSales,cur);$('m-sales-count').textContent=`${sales.length} transacciones`;
-  $('m-fees').textContent=fmt(tFees,cur);$('m-fees-pct').textContent=tSales>0?`${((tFees/tSales)*100).toFixed(2)}% de ventas`:'-';
-  $('m-refunds').textContent=fmt(tRef,cur);$('m-refunds-count').textContent=`${refunds.length} reembolso${refunds.length!==1?'s':''}`;
-  $('m-net').textContent=fmt(tSales-tFees-tRef,cur);
+  const tSales=sales.reduce((s,r)=>s+r.amtUSD,0);
+  const tFees=sales.reduce((s,r)=>s+r.feeUSD,0)+feeRows.reduce((s,r)=>s+Math.abs(r.amtUSD),0);
+  const tRef=Math.abs(refunds.reduce((s,r)=>s+r.amtUSD,0));
+  $('m-sales').textContent=fmtUSD(tSales);$('m-sales-count').textContent=`${sales.length} transacciones`;
+  $('m-fees').textContent=fmtUSD(tFees);$('m-fees-pct').textContent=tSales>0?`${((tFees/tSales)*100).toFixed(2)}% de ventas`:'-';
+  $('m-refunds').textContent=fmtUSD(tRef);$('m-refunds-count').textContent=`${refunds.length} reembolso${refunds.length!==1?'s':''}`;
+  $('m-net').textContent=fmtUSD(tSales-tFees-tRef);
 }
 
 function renderTable(rows){
@@ -340,18 +375,19 @@ function renderTable(rows){
   const labels={sale:'Venta',fee:'Fee',refund:'Refund'};
   const cls={sale:'type-sale',fee:'type-fee',refund:'type-refund'};
   tbody.innerHTML=slice.map(r=>{
-    const amtStr=r.type==='sale'?fmt(r.amount,r.currency):`-${fmt(Math.abs(r.amount),r.currency)}`;
+    const amtUSDStr=r.type==='sale'?fmtUSD(r.amtUSD):`-${fmtUSD(Math.abs(r.amtUSD))}`;
     const amtCol=r.type==='sale'?'var(--pp-blue)':r.type==='fee'?'var(--amber)':'var(--red)';
-    const feeStr=r.type==='sale'&&r.fee>0?`-${fmt(r.fee,r.currency)}`:'-';
-    const netStr=r.type==='sale'?fmt(r.net,r.currency):'-';
-    const netCol=r.net>=0?'var(--green)':'var(--red)';
+    const feeStr=r.type==='sale'&&r.feeUSD>0?`-${fmtUSD(r.feeUSD)}`:'-';
+    const netStr=r.type==='sale'?fmtUSD(r.netUSD):'-';
+    const netCol=r.netUSD>=0?'var(--green)':'var(--red)';
+    const origStr=r.currency!=='USD'?`<div class="orig-amt">${fmt(r.amount,r.currency)}</div>`:'';
     return `<tr>
       <td><span class="type-badge ${cls[r.type]}">${labels[r.type]}</span></td>
       <td>${fmtDate(r.date)}</td>
       <td class="mono">${(r.id||'').substring(0,13)}</td>
-      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)" title="${r.desc}">${r.desc}</td>
+      <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)" title="${r.desc}">${r.desc}</td>
       <td class="mono" style="font-size:10px;color:var(--muted)">${r.email}</td>
-      <td style="text-align:right;color:${amtCol};font-family:'Fraunces',serif;font-size:14px;font-weight:600">${amtStr}</td>
+      <td style="text-align:right;color:${amtCol};font-family:'Fraunces',serif;font-size:14px;font-weight:600">${amtUSDStr}${origStr}</td>
       <td style="text-align:right;color:var(--amber);font-size:11px">${feeStr}</td>
       <td style="text-align:right;color:${netCol};font-size:11px">${netStr}</td>
     </tr>`;
@@ -362,13 +398,14 @@ function changePage(dir){S.page=Math.max(1,Math.min(Math.ceil(S.rows.length/S.pa
 
 function exportCSV(){
   if(!S.rows.length) return;
-  const h=['Tipo','Fecha','ID','Descripcion','Email','Venta','Fee','Neto','Moneda'];
-  const data=S.rows.map(r=>[r.type,r.date,r.id,`"${r.desc}"`,r.email,r.amount.toFixed(2),r.fee.toFixed(2),r.net.toFixed(2),r.currency]);
+  const h=['Tipo','Fecha','ID','Descripcion','Email','Moneda original','Monto original','Venta USD','Fee USD','Neto USD'];
+  const data=S.rows.map(r=>[r.type,r.date,r.id,`"${r.desc}"`,r.email,r.currency,r.amount.toFixed(2),r.amtUSD.toFixed(2),r.feeUSD.toFixed(2),r.netUSD.toFixed(2)]);
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([[h,...data].map(r=>r.join(',')).join('\n')],{type:'text/csv'}));
-  a.download=`paypal_ventas_${new Date().toISOString().split('T')[0]}.csv`;a.click();
+  a.download=`paypal_ventas_usd_${new Date().toISOString().split('T')[0]}.csv`;a.click();
 }
 
+function fmtUSD(val){return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(val);}
 function fmt(val,cur){return new Intl.NumberFormat('en-US',{style:'currency',currency:cur||'USD'}).format(val);}
 function fmtDate(iso){if(!iso)return'-';return new Date(iso).toLocaleDateString('es',{day:'2-digit',month:'short',year:'numeric'});}
 
